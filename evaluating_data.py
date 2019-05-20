@@ -156,8 +156,7 @@ def print_truth_values(y_train, matrix, convert_label_map):
         rate_falsetrue = calculate_falsetrue(matrix, i)
         not_predicted = calculate_not_predicted(matrix, i)
 
-        if convert_label_map:
-            inverted = convert_label_map['label_encoder'].inverse_transform([i])
+        inverted = convert_label_map['label_encoder'].inverse_transform(i)
         
         print(inverted + ' has a truefalse rate of %1.5f' %rate_truefalse)
         print(inverted + ' has a falsetrue rate of %1.5f' %rate_falsetrue)

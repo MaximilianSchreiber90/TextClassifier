@@ -238,7 +238,7 @@ def get_test_data_for_label(df, labelname, split_ratio):
     #if(result_df.size == 0):
         #error message
         
-    random_df = df[df.category != labelname]
+    random_df = df[df.category != labelname].copy()
     random_df['category'] = 'NONE'             # check if exist
     random_size = random_df.category.count()
         
