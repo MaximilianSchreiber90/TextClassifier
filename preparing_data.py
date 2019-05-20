@@ -1,9 +1,10 @@
 '''
 df is the datasate which shall be split in train and test
 test_size_split is an float between 0 and 1. It determines the size of the test data
+validate_set a boolean (set to false by default) which splits test set into validation and test set (50:50)
 returns a map containing the following keys: 'X_train', 'y_train', 'X_test', 'y_test' 
 '''
-def split_dataset(df, test_size_split = 0.4):
+def split_dataset(df, test_size_split = 0.4, validate_set=False):
 
     X = df.words
     y = df.category
@@ -12,9 +13,16 @@ def split_dataset(df, test_size_split = 0.4):
     sss = StratifiedShuffleSplit(n_splits=5, test_size=test_size_split, random_state=0)
     sss.get_n_splits(X, y)
     for train_index, test_index in sss.split(X, y):
-        print("TRAIN:", train_index, "TEST:", test_index)
         X_train, X_test = X.iloc[train_index], X.iloc[test_index]
         y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+        
+    if validate_set:
+        sss2 = StratifiedShuffleSplit(n_splits=3, test_size=0.5, random_state=0)
+        sss.get_n_splits(X_test, y_test)
+        for validate_index, test_index in sss2.split(X_test, y_test):
+            X_validate, X_test = X.iloc[validate_index], X.iloc[test_index]
+            y_validate, y_test = y.iloc[validate_index], y.iloc[test_index]
+        return {'X_train':X_train, 'y_train':y_train, 'X_test':X_test ,'y_test':y_test, 'X_validate':X_validate, 'y_validate':y_validate}
         
     return {'X_train':X_train, 'y_train':y_train, 'X_test':X_test ,'y_test':y_test}
 

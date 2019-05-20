@@ -170,11 +170,15 @@ def print_truth_values(y_train, matrix, convert_label_map):
 ################################################################################################################################################
 #################################################### Print functions  ##########################################################################
 
-
-
 from sklearn.metrics import f1_score
 
 def print_f1(y_true, y_pred):
+    '''
+    y_true acutal values of the test prediction data
+    y_pred predicted values by the classifier
+    prints the F1 scores for a binary classification prediction
+    '''
+    
     print("F1 Score (macro, micro, weighted): ")
     print(f1_score(y_true, y_pred, average='macro'))
     f1 = f1_score(y_true, y_pred, average='micro')
@@ -182,14 +186,20 @@ def print_f1(y_true, y_pred):
     print(f1_score(y_true, y_pred, average='weighted'))  
     return f1
 
-
-
+#------------------------------------------------------------------------------#
 
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from matplotlib import pyplot
 
-def print_AUC(X_test, prob, key):
+def print_AUC(X_test, prob, label):
+    '''
+    X_test test data
+    prob is the probability for each test set
+    label of the prediction
+    prints the AUC for a binary classification prediction
+    '''
+    
     # calculate AUC
     auc = roc_auc_score(X_test, prob)
     print('AUC: %.3f' % auc)
@@ -200,19 +210,27 @@ def print_AUC(X_test, prob, key):
     # plot the roc curve for the model
     pyplot.plot(fpr, tpr, marker='.')
     # show the plot
-    pyplot.title(key)
+    pyplot.title(label)
     pyplot.show()
     
+
+#------------------------------------------------------------------------------#    
     
 from sklearn.utils.fixes import signature
 from sklearn.metrics import precision_recall_curve
+from matplotlib import pyplot
 
 def print_prec_rec(y_test, pred):
+    '''
+    y_test are the labels for the test data
+    pred is the prediction
+    prints a precision recall diagram for a binary classification prediction
+    '''
     precision, recall, _ = precision_recall_curve(y_test, pred)
 
     # In matplotlib < 1.5, plt.fill_between does not have a 'step' argument
     step_kwargs = ({'step': 'post'}
-                   if 'step' in signature(plt.fill_between).parameters
+                   if 'step' in signature(pyplot.fill_between).parameters
                    else {})
     pyplot.step(recall, precision, color='b', alpha=0.2,
              where='post')
@@ -228,3 +246,141 @@ def print_prec_rec(y_test, pred):
     pyplot.ylim([0.0, 1.05])
     pyplot.xlim([0.0, 1.0])
     pyplot.show()
+    
+################################################################################################################################################
+#################################################### Utility functions  ##########################################################################   
+    
+from numpy import array
+
+def convert_probability_list(list):
+    '''
+    takes a list of predicted probabilities (contains a list for each prediction with % for true and false)
+    returns a list only containing the probability of a positiv label
+    '''
+    dummyList = []
+    for l in list:
+        dummyList.append(l[-1])
+    
+    return array(dummyList)
+
+#------------------------------------------------------------------------------#
+
+def convert_probability_trueFalse(array, threshold):
+    '''
+    array containing the probabily predictions
+    threshold at which a label shall be labeled as true
+    returns an array containing only 0 and 1
+    '''
+    resultarray = array.copy()
+    for i in range(0, len(array)):
+        if resultarray[i] >= threshold:
+            resultarray[i] = 1
+        else:
+            resultarray[i] = 0
+    return resultarray
+
+
+################################################################################################################################################
+#################################################### Grid Search  ##########################################################################  
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
+
+class ClassifierConfiguration:              #rename ClassifierConfiguration   
+    
+#    logReg
+#    svm
+#    c_value
+#    tfidf_value    
+    
+    def __init__(self, label, classifier, c_value, tfidf_value, acc):
+        self.label = label
+        if isinstance(classifier, LogisticRegression):
+            self.logReg = LogisticRegression(C=c_value)
+            self.logRegTfidf = tfidf_value
+            self.logRegAcc = acc
+        if isinstance(classifier, LinearSVC):
+            self.svc = LinearSVC(C = c_value)
+            self.svcTfidf = tfidf_value
+            self.svcAcc = acc
+#        self.thrashold = thrashold
+    
+    def getBestClassifier(self):
+        if logRegAcc < svcAcc:
+            return svc
+        else:
+            return logReg
+        
+    def bestValue(self):
+        best_value = 0
+        best_key = 0
+        
+        for key, value in self.thrashold.items():
+            if value >= best_value:
+                best_value = value
+                best_key = key
+        
+        return "thrashold: {}".format(best_key)
+
+    
+#------------------------------------------------------------------------------#
+
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from preparing_data import *
+from sklearn.preprocessing import LabelEncoder
+
+def do_gridsearch(df_map, classifier, tfidf_values = (0.15, 0.25), c_values = [0.1, 0.25, 0.5, 1, 5, 10]):
+    '''
+    df_map is a map<label, df> containing the label and the associated dataframe
+    classifier which shall be used
+    tfidf_values which values tfidf should consider 
+    c_values which the classifier (logistic regression, svd) should consider
+    '''
+    classifierContainerList = {}
+    
+    pipeline = Pipeline([
+        ('tfidf', TfidfVectorizer(stop_words='english', min_df=5)),
+        ('classifier', classifier),
+    ])
+
+    parameters_pipeline = {
+        'tfidf__max_df': tfidf_values,
+        'classifier__C': c_values,
+    }
+
+    grid_search = GridSearchCV(pipeline, parameters_pipeline, n_jobs=-1, cv=3)
+
+    for key, df in df_map.items():
+        print("Dataset: "+key)
+
+        #splitting data
+        split_map_all = split_dataset(df)
+        X_train_all = split_map_all['X_train']
+        y_train_all = split_map_all['y_train']
+        X_test_all = split_map_all['X_test']
+        y_test_all = split_map_all['y_test']
+
+        #encoding label
+        integer_encoded_train = y_train_all.replace("NONE", 0).replace(key, 1)
+        integer_encoded_test = y_test_all.replace("NONE", 0).replace(key, 1)
+
+        grid_search.fit(X_train_all, integer_encoded_train)
+
+        print(grid_search.best_params_)
+        classifierContainerList[key] = ClassifierConfiguration(key, classifier, grid_search.best_params_['classifier__C'], grid_search.best_params_['tfidf__max_df'])
+        print(grid_search.best_score_)
+        pipeline_best = grid_search.best_estimator_
+        accuracy = pipeline_best.score(X_test_all, integer_encoded_test)
+        print('The accuracy on testing set is: {0:.1f}%'.format(accuracy*100))
+        
+    return classifierContainerList
+        
+################################################################################################################################################
+#################################################### Print Truthtable  ##########################################################################  
+
+
+################################################################################################################################################
+#################################################### Determine Threshold  ##########################################################################  
