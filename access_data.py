@@ -239,7 +239,7 @@ def get_test_data_for_label(df, labelname, split_ratio):
         #error message
         
     random_df = df[df.category != labelname]
-    random_df['category'] = 'NONE'
+    random_df['category'] = 'NONE'             # check if exist
     random_size = random_df.category.count()
         
     random_size_needed = int(math.ceil(label_size / split_ratio))

@@ -285,12 +285,10 @@ def convert_probability_trueFalse(array, threshold):
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
 
-class ClassifierConfiguration:              #rename ClassifierConfiguration   
-    
-#    logReg
-#    svm
-#    c_value
-#    tfidf_value    
+class ClassifierConfiguration:              
+    '''
+    created by do_gridsearch. Contains configuration information about a classifier
+    '''
     
     def __init__(self, label, classifier, c_value, tfidf_value, acc):
         self.label = label
@@ -302,30 +300,22 @@ class ClassifierConfiguration:              #rename ClassifierConfiguration
             self.svc = LinearSVC(C = c_value)
             self.svcTfidf = tfidf_value
             self.svcAcc = acc
-#        self.thrashold = thrashold
-    
-    def getBestClassifier(self):
-        if logRegAcc < svcAcc:
-            return svc
-        else:
-            return logReg
-        
-    def bestValue(self):
-        best_value = 0
-        best_key = 0
-        
-        for key, value in self.thrashold.items():
-            if value >= best_value:
-                best_value = value
-                best_key = key
-        
-        return "thrashold: {}".format(best_key)
 
+#------------------------------------------------------------------------------#
+
+class ClassifierContainer:
+    def __init__(self, label, classifier, vectorizer, svd):
+        self.label = label
+        self.classifier = classifier
+        self.vectorizer = vectorizer
+        self.svd = svd
+        self.thrashold = 0.5    
     
 #------------------------------------------------------------------------------#
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -368,9 +358,11 @@ def do_gridsearch(df_map, classifier, tfidf_values = (0.15, 0.25), c_values = [0
         integer_encoded_test = y_test_all.replace("NONE", 0).replace(key, 1)
 
         grid_search.fit(X_train_all, integer_encoded_train)
+        y_prediction = grid_search.predict(X_test_all)
 
         print(grid_search.best_params_)
-        classifierContainerList[key] = ClassifierConfiguration(key, classifier, grid_search.best_params_['classifier__C'], grid_search.best_params_['tfidf__max_df'])
+        classifierContainerList[key] = ClassifierConfiguration(key, classifier, grid_search.best_params_['classifier__C'], grid_search.best_params_['tfidf__max_df'],
+                                                               accuracy_score(integer_encoded_test,y_prediction))
         print(grid_search.best_score_)
         pipeline_best = grid_search.best_estimator_
         accuracy = pipeline_best.score(X_test_all, integer_encoded_test)
@@ -379,8 +371,50 @@ def do_gridsearch(df_map, classifier, tfidf_values = (0.15, 0.25), c_values = [0
     return classifierContainerList
         
 ################################################################################################################################################
-#################################################### Print Truthtable  ##########################################################################  
+#################################################### Label Information  ##########################################################################  
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.decomposition import TruncatedSVD
+from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
 
+def print_label_distribution(df, classifier = LinearSVC(C=0.7, random_state=42)):
+    '''
+    df for multi label classification
+    classifier which should be used for the evaluation
+    prints truth table (next sklearn version has inbuild function for this)
+    prints falsetrue truefalse ratio per label
+    '''
+    
+    # splitting data
+    split_map = split_dataset(df)
+    X_train = split_map['X_train']
+    y_train = split_map['y_train']
+    X_test = split_map['X_test']
+    y_test = split_map['y_test']
+
+    # neccessary for multilabeling
+    convert_label_map = convert_labels_for_multilabeling(y_train, y_test)
+    y_train = convert_label_map['y_train_encoded']
+    y_test = convert_label_map['y_test_encoded']
+    
+    tfidf_vectorizer =  TfidfVectorizer(stop_words='english', max_df=0.15)
+    X_train_vect = tfidf_vectorizer.fit_transform(X_train)
+    X_test_vect = tfidf_vectorizer.transform(X_test)
+
+    # classifier may take one
+    cfl= OneVsRestClassifier(classifier)
+    cfl.fit(X_train_vect, y_train)
+
+    from sklearn.metrics import classification_report
+    prediction = cfl.predict(X_test_vect)
+    #predictions_binary = (prediction > 0.4).as_type(np.float64)
+    report = classification_report(y_test, prediction)
+    print(report)
+
+    # in the new sklearn version there will be an inbuild function for truthtables for multilabel classification
+    matrix = create_confusion_matrix(y_test, X_test_vect, prediction, 0.5)
+    print_truth_values(y_train, matrix, convert_label_map)
 
 ################################################################################################################################################
 #################################################### Determine Threshold  ##########################################################################  
