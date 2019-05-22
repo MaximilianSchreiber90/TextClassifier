@@ -1,3 +1,47 @@
+from nltk.corpus import reuters
+
+def get_reuters():
+    # Documents in a category
+    category_trade = reuters.fileids("trade")
+    category_money = reuters.fileids("money-fx") + reuters.fileids("money-supply")
+    category_interest = reuters.fileids("interest")
+    
+    text_trade = []
+    for i in range(0,len(category_trade)):
+        text_trade.append(reuters.raw(category_trade[i]))
+    
+    text_money = []
+    for i in range(0,len(category_money)):
+        text_money.append(reuters.raw(category_money[i]))
+                          
+    text_interest = []
+    for i in range(0,len(text_interest)):
+        text_interest.append(reuters.raw(text_interest[i]))
+
+    trade_data = pd.DataFrame(data={'text': text_trade})
+    trade_data['category'] = 'TRADE'
+    money_data = pd.DataFrame(data={'text': text_money})
+    money_data['category'] = 'MONEY'
+    interest_data = pd.DataFrame(data={'text': text_interest})
+    interest_data['category'] = 'INTEREST'    
+    
+    # picking only relevant columns
+    selected_columns = ['text', 'category']
+    df = trade_data
+    df = df.append(money_data)
+    df = df.append(interest_data)
+    
+    return df
+
+#------------------------------------------------------------------------------#
+
+def reuters_all_category():
+    categories = reuters.categories()
+    print(str(len(categories)) + " categories")
+    print('Category list: ' +str(categories))
+
+################################################################################################################################################
+
 from sklearn.datasets import fetch_20newsgroups 
 import pandas as pd
 
@@ -102,7 +146,7 @@ def combine_huff_categories(df):
     
     # Delete entries   
     remove_category_list = ['BLACK VOICES', 'WEIRD NEWS', 'QUEER VOICES', 'LATINO VOICES', "FIFTY", "GOOD NEWS", "PARENTS", "MEDIA", "CRIME", "WOMEN", "IMPACT", "THE WORLDPOST", "WORLD NEWS", "COLLEGE",
-        'EDUCATION', 'WORLDPOST', 'WELLNESS','PARENTING','HOME & LIVING','STYLE & BEAUTY','DIVORCE','WEDDINGS','ENVIRONMENT','CULTURE & ARTS']
+        'EDUCATION', 'WORLDPOST', 'WELLNESS','PARENTING','HOME & LIVING','STYLE & BEAUTY','DIVORCE','WEDDINGS','ENVIRONMENT','CULTURE & ARTS', 'MONEY']
     for label in remove_category_list:
         df = df[df.category != label]
     
@@ -127,8 +171,9 @@ def get_all_data_prepared(min_len = 7):
     '''
     huff_data = only_relevant_columns(combine_huff_categories(get_huffpost()))
     df_20news = get_20news()
+    df_reuters = get_reuters()
     
-    df = huff_data.append(df_20news)
+    df = huff_data.append(df_20news).append(df_reuters)
     
     df = add_word_vector_column(df)
     df = delete_short_datasets(df, min_len)
@@ -231,26 +276,26 @@ def get_test_data_for_label(df, labelname, split_ratio):
     returns a randomly generated dataframe contining selected label including nose data from all other labels
     '''
     #create new DF containing only selected label
-    result_df = df[df.category == labelname].copy()
-    
-    label_size = result_df.category.count()
-    
-    #if(result_df.size == 0):
-        #error message
+    label_df = df[df.category == labelname].copy()    
+    label_size = label_df.shape[0]
         
     random_df = df[df.category != labelname].copy()
-    random_df['category'] = 'NONE'             # check if exist
-    random_size = random_df.category.count()
-        
-    random_size_needed = int(math.ceil(label_size / split_ratio))
+    random_df['category'] = 'NONE'
+    random_size = random_df.shape[0]
+    
+    random_needed = (1/split_ratio)-1
+    random_size_needed = int(math.ceil(label_size*random_needed))  
     
     if(random_size_needed < random_size):
-        result_df= result_df.append(random_df.sample(n = random_size_needed))
+        result_df= label_df.append(random_df.sample(n = random_size_needed))
     else:
-        print("There were not enough data to create a split with split_ratio {:}. Only selected {:} instead of {:} random data".format(split_ratio, random_size, random_size_needed))
-        result_df= result_df.append(random_df.sample(n = random_size))
+        reverse_split_ratio = 1-split_ratio
+        label_needed = (1/reverse_split_ratio)-1
+        label_size_needed = int(math.ceil(random_size*label_needed))
+                                
+        result_df= label_df.sample(n = label_size_needed).append(random_df)
 
-    return result_df
+    return result_df.sample(frac=1)
 
 #------------------------------------------------------------------------------#   
  
