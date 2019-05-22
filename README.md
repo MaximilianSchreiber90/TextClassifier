@@ -1,6 +1,6 @@
 # TextClassifier
 
-Data: Der Code geht davon aus, dass ein Data Verzeichnis existiert in dem ein paar Daten zu finden sind. Daten sind in GoogleDrive
+<b>Data</b>: Der Code geht davon aus, dass ein Data Verzeichnis existiert in dem ein paar Daten zu finden sind. Daten sind in GoogleDrive
 
 Binary.ipynb: Letzte Version mit der ich experimentiert habe um Ergebnisse für Binary Classification zu gewinnen. Alle relevanten Infos sind jedoch auch in Final Pipeline.ipynb enthalten
 
